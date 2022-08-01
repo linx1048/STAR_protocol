@@ -1,0 +1,102 @@
+---
+title: "STAR Protocol - Targeted Screen Analysis (Example)"
+author: "Kevin Lin"
+date: "4/28/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Note: to manually change sample screens to investigate, see line 58-59
+
+# Loads packages
+
+```{r packages, include = FALSE, echo = FALSE}
+library(corrplot)
+library(ggplot2)
+library(precrec)
+```
+
+# Load Data (Raw Reads)
+
+```{r load, echo=FALSE, include = FALSE}
+# Loads datasets
+
+reads <- read.delim("raw_reads.tsv")
+
+```
+
+# Depth-normalization of Reads
+
+```{r norm_reads, echo=FALSE, include = FALSE}
+
+# apply normalization to raw reads
+norm_reads = normalize_reads(reads[,3:ncol(reads)])
+norm_reads = cbind(reads[,1:2], norm_reads)
+
+
+```
+
+# Calculate LFC (log fold change)
+
+```{r lfc, echo=FALSE, include = FALSE}
+
+# calculate log2FC (subtract avg T0 (across all replicates) from norm_reads)
+lfc = calc_lfc(norm_reads)
+
+
+```
+
+
+# Replicate Correlation Plots
+
+```{r rep_corr, echo=FALSE, include = FALSE}
+
+# Select screen/timepoint of interest manually here (e.g. DMSO T12)
+pattern = "DMSO"
+pattern2 = "T12"
+
+# Select columns matching par
+y = grep(pattern, x = colnames(lfc))
+z = grep(pattern2, x = colnames(lfc))
+screens = intersect(y,z) # select columns representing screens to subset
+
+# Calculate pearson's correlation of LFC vectors for each sample for pairwise replicates
+
+subset_df = lfc[,screens] # subset selected columns
+# 
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...) {
+    usr <- par("usr")
+    on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    Cor <- abs(cor(x, y)) # Remove abs function if desired
+    txt <- paste0(prefix, format(c(Cor, 0.123456789), digits = digits)[1])
+    if(missing(cex.cor)) {
+        cex.cor <- 0.1 / strwidth(txt)
+    }
+    text(0.5, 0.5, txt,
+         cex = 1 + cex.cor * Cor) # Resize the text by level of correlation
+}
+# scatterplot of replicates
+pairs(subset_df, upper.panel= panel.cor)
+
+
+
+```
+
+
+# Essential Gene Recovery
+
+```{r ess, echo=FALSE, include = FALSE}
+
+# load essential gene set
+load("core_essGenes.rda") # download from Hart et al. 2015, 684 core essential gene set
+essentials_set = essGenes
+
+colnames(lfc)[1] = "gene"
+
+out = essential_qc(lfc, essentials_set, screens)
+
+```
